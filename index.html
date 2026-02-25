@@ -1,23 +1,138 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OrnnWeb Tools</title>
   <style>
-    body { font-family: sans-serif; margin: 2rem; }
-    h1 { margin-bottom: 1rem; }
-    ul { list-style: none; padding: 0; }
-    li { margin: 0.5rem 0; }
-    a { text-decoration: none; color: #007bff; }
-    a:hover { text-decoration: underline; }
+    :root {
+      --primary-color: #00d2ff;
+      --bg-color: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --text-main: #f8fafc;
+      --text-dim: #94a3b8;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background-color: var(--bg-color);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(58, 123, 213, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.1) 0px, transparent 50%);
+      color: var(--text-main);
+      margin: 0;
+      padding: 3rem 2rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 3rem;
+      background: linear-gradient(to right, #fff, var(--primary-color));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-align: center;
+    }
+
+    /* 关键：横向排列容器 */
+    .tool-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      justify-content: center;
+      max-width: 1200px;
+      padding: 0;
+      list-style: none;
+    }
+
+    /* 卡片基础样式 */
+    .tool-item {
+      flex: 1 1 300px; /* 最小300px，自动伸展 */
+      max-width: 350px;
+    }
+
+    .tool-card {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 1.5rem;
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.3s ease;
+      box-sizing: border-box;
+    }
+
+    .tool-card:hover {
+      border-color: var(--primary-color);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 20px rgba(0, 0, 0, 0.3);
+      background: rgba(45, 55, 72, 0.9);
+    }
+
+    .tool-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--primary-color);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+    }
+
+    /* 小装饰图标 */
+    .tool-name::before {
+      content: "◈";
+      margin-right: 8px;
+      font-size: 0.8rem;
+      opacity: 0.7;
+    }
+
+    .tool-desc {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    /* 适配移动端 */
+    @media (max-width: 600px) {
+      .tool-item {
+        flex: 1 1 100%;
+      }
+    }
   </style>
 </head>
 <body>
+
   <h1>OrnnWeb Tools</h1>
-  <ul>
-    <li><a href="/OrnnWeb/FlameGraph-Analyzer/">FlameGraph Analyzer</a></li>
-    <li><a href="/OrnnWeb/GitDir-Downloader/">GitDir Downloader</a></li>
-    <li><a href="/OrnnWeb/EPUB-CC/">EPUB-CC</a></li>
-  </ul>
+
+  <ul class="tool-grid">
+    <li class="tool-item">
+      <a href="/OrnnWeb/FlameGraph-Analyzer/" class="tool-card">
+        <span class="tool-name">FlameGraph Analyzer</span>
+        <span class="tool-desc">深度集成 AI 交互能力，让复杂的火焰图堆栈分析变得直观易懂。</span>
+      </a>
+    </li>
+
+    <li class="tool-item">
+      <a href="/OrnnWeb/GitDir-Downloader/" class="tool-card">
+        <span class="tool-name">GitDir Downloader</span>
+        <span class="tool-desc">轻量级工具，支持快速下载 GitHub/GitLab 仓库中的特定子目录或单文件。</span>
+      </a>
+    </li>
+
+    <li class="tool-item">
+      <a href="/OrnnWeb/EPUB-CC/" class="tool-card">
+        <span class="tool-name">EPUB-CC</span>
+        <span class="tool-desc">专为电子书爱好者打造，实现 EPUB 格式文件的繁简无损转换。</span>
+      </a>
+    </li>
+
+    </ul>
+
 </body>
 </html>
