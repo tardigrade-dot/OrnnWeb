@@ -42,7 +42,7 @@ jobs:
             echo "Building $name..."
             cd "$name"
             npm install
-            npx vite build --base=/$name/
+            npx vite build --base=/OrnnWeb/$name/
             cd ..
 
             mkdir -p dist/$name
@@ -53,7 +53,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
-          
+
       - name: List dist
         run: ls -R dist
 
