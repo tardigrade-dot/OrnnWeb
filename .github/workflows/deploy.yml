@@ -1,0 +1,56 @@
+name: Build All Tools
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main repo (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build git-folder-zip
+        run: |
+          cd git-folder-zip
+          npm install
+          npm run build -- --base=/git-folder-zip/
+
+      - name: Build FlameGraph-Analyzer
+        run: |
+          cd FlameGraph-Analyzer
+          npm install
+          npm run build -- --base=/FlameGraph-Analyzer/
+
+      - name: Move outputs
+        run: |
+          mkdir -p dist/git-folder-zip
+          mkdir -p dist/FlameGraph-Analyzer
+          cp -r git-folder-zipa/dist/* dist/git-folder-zip/
+          cp -r FlameGraph-Analyzer/dist/* dist/FlameGraph-Analyzer/
+
+      - name: Deploy to Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
