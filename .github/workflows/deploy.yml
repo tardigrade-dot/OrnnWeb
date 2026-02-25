@@ -4,12 +4,17 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout main repo (with submodules)
+      - name: Checkout (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: true
@@ -18,27 +23,33 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
-      - name: Build git-folder-zip
+      - name: Build all sub projects
         run: |
-          cd git-folder-zip
-          npm install
-          npm run build -- --base=/git-folder-zip/
+          mkdir -p dist
 
-      - name: Build FlameGraph-Analyzer
-        run: |
-          cd FlameGraph-Analyzer
-          npm install
-          npm run build -- --base=/FlameGraph-Analyzer/
+          for dir in */ ; do
+            # 去掉结尾斜杠
+            name=${dir%/}
 
-      - name: Move outputs
-        run: |
-          mkdir -p dist/git-folder-zip
-          mkdir -p dist/FlameGraph-Analyzer
-          cp -r git-folder-zip/dist/* dist/git-folder-zip/
-          cp -r FlameGraph-Analyzer/dist/* dist/FlameGraph-Analyzer/
+            # 跳过 .github 或 dist 等非项目目录
+            if [ ! -f "$name/package.json" ]; then
+              continue
+            fi
 
-      - name: Deploy to Pages
+            echo "Building $name..."
+
+            cd "$name"
+            npm install
+            npx vite build --base=/$name/
+            cd ..
+
+            mkdir -p dist/$name
+            cp -r $name/dist/. dist/$name/
+          done
+
+      - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
