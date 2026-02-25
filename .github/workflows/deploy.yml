@@ -35,7 +35,7 @@ jobs:
         run: |
           mkdir -p dist/git-folder-zip
           mkdir -p dist/FlameGraph-Analyzer
-          cp -r git-folder-zipa/dist/* dist/git-folder-zip/
+          cp -r git-folder-zip/dist/* dist/git-folder-zip/
           cp -r FlameGraph-Analyzer/dist/* dist/FlameGraph-Analyzer/
 
       - name: Deploy to Pages
