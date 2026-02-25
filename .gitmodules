@@ -4,3 +4,6 @@
 [submodule "FlameGraph-Analyzer"]
 	path = FlameGraph-Analyzer
 	url = https://github.com/bnwwnb/FlameGraph-Analyzer
+[submodule "GitDir-Downloader"]
+	path = GitDir-Downloader
+	url = https://github.com/bnwwnb/GitDir-Downloader
