@@ -1,6 +1,3 @@
-[submodule "git-folder-zip"]
-	path = git-folder-zip
-	url = https://github.com/bnwwnb/git-folder-zip
 [submodule "FlameGraph-Analyzer"]
 	path = FlameGraph-Analyzer
 	url = https://github.com/bnwwnb/FlameGraph-Analyzer
