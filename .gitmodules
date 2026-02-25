@@ -7,3 +7,6 @@
 [submodule "EPUB-CC"]
 	path = EPUB-CC
 	url = https://github.com/bnwwnb/EPUB-CC
+[submodule "MNIST-Drawer"]
+	path = MNIST-Drawer
+	url = https://github.com/bnwwnb/MNIST-Drawer
