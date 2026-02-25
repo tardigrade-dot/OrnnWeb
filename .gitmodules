@@ -4,3 +4,6 @@
 [submodule "GitDir-Downloader"]
 	path = GitDir-Downloader
 	url = https://github.com/bnwwnb/GitDir-Downloader
+[submodule "EPUB-CC"]
+	path = EPUB-CC
+	url = https://github.com/bnwwnb/EPUB-CC
