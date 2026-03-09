@@ -73,12 +73,21 @@ export default function App() {
   const scoreRef = useRef(0);
   const wordsEliminatedRef = useRef(0);
   const levelRef = useRef(1);
+  const customWordsRef = useRef<string[] | null>(null);
+
+  // Sync customWords state to ref
+  useEffect(() => {
+    customWordsRef.current = customWords;
+  }, [customWords]);
 
   // --- Game Logic ---
 
   const spawnWord = useCallback(() => {
     const isFast = Math.random() < 0.15; // 15% 概率生成高速单词
-    const wordList = customWords && customWords.length > 0 ? customWords : WORDS;
+    // Use customWords from ref (to avoid stale closure), fallback to default WORDS
+    const wordList = customWordsRef.current && customWordsRef.current.length > 0
+      ? customWordsRef.current
+      : WORDS;
     const baseText = wordList[Math.floor(Math.random() * wordList.length)];
     const x = Math.random() * (CANVAS_WIDTH - 100) + 50;
     const id = Date.now() + Math.random();
@@ -90,7 +99,7 @@ export default function App() {
     if (isFast) {
       // 高速拦截者设计：短小、极快、粉色
       color = '#f472b6'; 
-      speedMultiplier = 1.5 + Math.random() * 0.6; 
+      speedMultiplier = 1.5 + Math.random() * 0.3; 
       text = baseText.substring(0, Math.min(baseText.length, 4)); // 缩短单词
     } else {
       if (text.length > 6) color = '#f87171'; // 红色（长单词）
@@ -369,22 +378,27 @@ export default function App() {
   };
 
   const handleGenerateAIWords = async () => {
-    if (!domainInput) return;
+    if (!domainInput.trim()) return;
     setIsGeneratingAI(true);
     setAiError(null);
     setModelProgress(0);
 
     try {
       const { pipeline, env } = await import('@huggingface/transformers');
-      
+
       // Suppress noisy ONNX Runtime warnings
       // @ts-ignore
       env.logLevel = 'error';
       // @ts-ignore
       env.backends.onnx.logLevel = 'error';
-      
-      const generator = await pipeline('text-generation', 'Xenova/gpt2', {
+
+      // Use SmolLM-360M-Instruct - small, fast, good for instruction following
+      // Alternative: 'Qwen/Qwen2.5-0.5B-Instruct' for better multilingual support
+      const modelId = 'onnx-community/Qwen3-0.6B-ONNX';
+
+      const generator = await pipeline('text-generation', modelId, {
         device: 'webgpu',
+        dtype: 'q4f16', // 4-bit quantization for faster inference
         session_options: {
           logSeverityLevel: 3, // 3 = Error
         },
@@ -395,21 +409,47 @@ export default function App() {
         }
       });
 
-      const prompt = `List 50 English words related to ${domainInput}, separated by spaces:`;
+      // Detect if input contains Chinese characters
+      const hasChinese = /[\u4e00-\u9fff]/.test(domainInput);
+
+      // Craft a better prompt for instruction-following model
+      const prompt = hasChinese
+        ? `请列出 50 个与"${domainInput}"相关的专业英语词汇或术语，用空格分隔。只输出词汇，不要解释。`
+        : `List 50 professional words or terms related to "${domainInput}". Output only the words, separated by spaces. No explanations.`;
+
       const output = await generator(prompt, {
-        max_new_tokens: 256,
+        max_new_tokens: 1024,
         temperature: 0.7,
+        top_p: 0.9,
         do_sample: true,
+        repetition_penalty: 1.2,
       });
 
-      const generatedText = (output as any)[0].generated_text.replace(prompt, '');
-      const words = generatedText.match(/[a-zA-Z]{3,12}/g) || [];
-      
-      if (words.length > 5) {
-        // Since gpt2 is small, it might not give 200. We'll take what we get and maybe repeat or just use them.
-        const uniqueWords = Array.from(new Set(words.map((w: string) => w.toLowerCase())));
+      const generatedText = (output as any)[0].generated_text;
+
+      // Extract words: support both Chinese and English
+      // For Chinese: extract 2-6 character terms
+      // For English: extract 3-12 letter words
+      let words: string[] = [];
+
+      console.log("generatedText: ",generatedText)
+      if (hasChinese) {
+        // Extract Chinese terms (2-6 characters) and English words
+        const chineseMatches = generatedText.match(/[\u4e00-\u9fff]{2,6}/g) || [];
+        const englishMatches = generatedText.match(/[a-zA-Z]{3,12}/g) || [];
+        words = [...chineseMatches, ...englishMatches];
+      } else {
+        words = generatedText.match(/[a-zA-Z]{3,12}/g) || [];
+      }
+
+      // Remove duplicates and filter
+      const uniqueWords = Array.from(
+        new Set(words.map((w: string) => w.trim().toLowerCase()))
+      ).filter(w => w.length >= 2 && w.length <= 12);
+
+      if (uniqueWords.length > 5) {
         setCustomWords(uniqueWords);
-        
+
         // Start game
         wordsRef.current = [];
         particlesRef.current = [];
@@ -426,11 +466,11 @@ export default function App() {
           soundService.startZenMusic();
         }
       } else {
-        setAiError("Model generated too few words. Try a broader domain.");
+        setAiError(`只生成 ${uniqueWords.length} 个词汇，请尝试其他领域。`);
       }
     } catch (err) {
-      console.error(err);
-      setAiError("WebGPU/Model failed. Ensure your browser supports WebGPU.");
+      console.error('AI generation error:', err);
+      setAiError("WebGPU 或模型加载失败。请确认浏览器支持 WebGPU。");
     } finally {
       setIsGeneratingAI(false);
       setModelProgress(null);
@@ -547,11 +587,24 @@ export default function App() {
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
                           <input
                             type="text"
-                            placeholder="Enter domain (e.g. Economics, Physics)"
+                            placeholder="输入领域 / Domain (e.g. 经济学，Physics, AI)"
                             value={domainInput}
                             onChange={(e) => setDomainInput(e.target.value)}
                             className="w-full px-6 py-3 bg-black/40 border border-white/10 rounded-full focus:outline-none focus:border-emerald-500 transition-all text-sm"
                           />
+                          {modelProgress !== null && (
+                            <div className="w-full bg-white/5 rounded-full h-1 overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-500 transition-all duration-300"
+                                style={{ width: `${modelProgress}%` }}
+                              />
+                            </div>
+                          )}
+                          {isGeneratingAI && !modelProgress && (
+                            <p className="text-emerald-400 text-[10px] uppercase font-bold text-center animate-pulse">
+                              正在加载模型 / Loading model...
+                            </p>
+                          )}
                           {aiError && <p className="text-red-400 text-[10px] uppercase font-bold text-center">{aiError}</p>}
                         </motion.div>
                       )}

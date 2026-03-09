@@ -7,5 +7,6 @@ coverage/
 .env*
 !.env.example
 .DS_Store
-dist/
-node_modules/
+
+*/dist/
+*/node_modules/
