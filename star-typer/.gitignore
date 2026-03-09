@@ -6,6 +6,3 @@ coverage/
 *.log
 .env*
 !.env.example
-.DS_Store
-dist/
-node_modules/
