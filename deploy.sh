@@ -20,6 +20,10 @@ fi
 for dir in */; do
     name=${dir%/}
     
+    if [ $name == "test" ]; then
+        echo "⏭️  Skipping $name (test)"
+        continue
+    fi
     # Skip directories without package.json
     if [ ! -f "$name/package.json" ]; then
         echo "⏭️  Skipping $name (no package.json)"

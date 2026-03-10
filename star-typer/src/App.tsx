@@ -386,67 +386,31 @@ export default function App() {
     try {
       const { pipeline, env } = await import('@huggingface/transformers');
 
-      // Suppress noisy ONNX Runtime warnings
-      // @ts-ignore
-      env.logLevel = 'error';
-      // @ts-ignore
-      env.backends.onnx.logLevel = 'error';
+      // env.backends.onnx.logLevel = 'info';
+      env.remoteHost = 'https://modelscope.cn';
+      // const modelId = 'HuggingFaceTB/SmolLM2-360M-Instruct';
+      const modelId = 'onnx-community/Qwen2.5-0.5B-Instruct';
 
-      // Use SmolLM-360M-Instruct - small, fast, good for instruction following
-      // Alternative: 'Qwen/Qwen2.5-0.5B-Instruct' for better multilingual support
-      const modelId = 'onnx-community/Qwen3-0.6B-ONNX';
-
+      console.log(`start load model ${modelId}...`);
       const generator = await pipeline('text-generation', modelId, {
-        device: 'webgpu',
-        dtype: 'q4f16', // 4-bit quantization for faster inference
-        session_options: {
-          logSeverityLevel: 3, // 3 = Error
-        },
-        progress_callback: (p: any) => {
-          if (p.status === 'progress') {
-            setModelProgress(p.progress);
-          }
-        }
+          device: 'webgpu',
+          dtype: 'q4', // 4-bit quantization for faster inference
+          progress_callback: (p) => {
+              if (p.status === 'progress') {
+                  setModelProgress("loading model...", p.progress);
+              }
+          },
       });
+      setModelProgress('load finished, start generate words...');
+      const prompt = `according to "${domainInput}", Generate 50 unique, professional terms. `;
+      const messages = [
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: prompt },
+      ];
+      const output = await generator(messages, { max_new_tokens: 2048, do_sample: false, enable_thinking: false });
+      const generatedText = output[0].generated_text.at(-1).content
 
-      // Detect if input contains Chinese characters
-      const hasChinese = /[\u4e00-\u9fff]/.test(domainInput);
-
-      // Craft a better prompt for instruction-following model
-      const prompt = hasChinese
-        ? `请列出 50 个与"${domainInput}"相关的专业英语词汇或术语，用空格分隔。只输出词汇，不要解释。`
-        : `List 50 professional words or terms related to "${domainInput}". Output only the words, separated by spaces. No explanations.`;
-
-      const output = await generator(prompt, {
-        max_new_tokens: 1024,
-        temperature: 0.7,
-        top_p: 0.9,
-        do_sample: true,
-        repetition_penalty: 1.2,
-      });
-
-      const generatedText = (output as any)[0].generated_text;
-
-      // Extract words: support both Chinese and English
-      // For Chinese: extract 2-6 character terms
-      // For English: extract 3-12 letter words
-      let words: string[] = [];
-
-      console.log("generatedText: ",generatedText)
-      if (hasChinese) {
-        // Extract Chinese terms (2-6 characters) and English words
-        const chineseMatches = generatedText.match(/[\u4e00-\u9fff]{2,6}/g) || [];
-        const englishMatches = generatedText.match(/[a-zA-Z]{3,12}/g) || [];
-        words = [...chineseMatches, ...englishMatches];
-      } else {
-        words = generatedText.match(/[a-zA-Z]{3,12}/g) || [];
-      }
-
-      // Remove duplicates and filter
-      const uniqueWords = Array.from(
-        new Set(words.map((w: string) => w.trim().toLowerCase()))
-      ).filter(w => w.length >= 2 && w.length <= 12);
-
+      const uniqueWords = extractWords(generatedText)
       if (uniqueWords.length > 5) {
         setCustomWords(uniqueWords);
 
@@ -477,6 +441,16 @@ export default function App() {
     }
   };
 
+  const extractWords = (text) => {
+    const words = text
+      .split(/\s+/)                         // 按空格分割
+      .map(w => w.replace(/[^a-zA-Z]/g, "")) // 去掉非字母
+      .filter(w => w.length >= 3)            // 去掉短词
+      .filter(w => !w.includes("'"))         // 去掉包含 '
+      .map(w => w.toLowerCase());            // 统一大小写
+
+    return [...new Set(words)];              // 去重
+  }
   const handleStartMission = async () => {
     if (wordSource === 'AI') {
       await handleGenerateAIWords();
@@ -671,7 +645,7 @@ export default function App() {
                         <RefreshCw className="w-5 h-5 animate-spin" />
                         <span>
                           {isGeneratingAI 
-                            ? (modelProgress !== null ? `Generating AI Words (${Math.round(modelProgress)}%)` : 'Loading AI Model...') 
+                            ? (modelProgress !== null ? modelProgress : 'Loading AI Model...') 
                             : 'Fetching URL Content...'}
                         </span>
                       </>
@@ -695,7 +669,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/90 backdrop-blur-xl"
+              className="absolute inset-0 flex flex-col items-center justify-center bg-blue-950/90 backdrop-blur-xl"
             >
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
@@ -703,8 +677,8 @@ export default function App() {
                 className="text-center space-y-8"
               >
                 <div className="space-y-2">
-                  <h2 className="text-6xl font-bold tracking-tighter text-red-500">MISSION FAILED</h2>
-                  <p className="text-white/60 uppercase tracking-widest text-sm">Your ship was destroyed by incoming debris</p>
+                  <h2 className="text-6xl font-bold tracking-tighter text-blue-500">MISSION FINISHED</h2>
+                  <p className="text-white/60 uppercase tracking-widest text-sm">Your mission is finished</p>
                 </div>
 
                 <div className="flex justify-center gap-12 py-8 border-y border-white/10">
