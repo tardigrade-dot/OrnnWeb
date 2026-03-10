@@ -32,13 +32,15 @@ jobs:
           if [ -f index.html ]; then
             cp index.html dist/
           fi
-
           for dir in */ ; do
             name=${dir%/}
             if [ ! -f "$name/package.json" ]; then
               continue
             fi
-
+            if [[ $name =~ ^test ]]; then
+              echo "⏭️  Skipping $name (test)"
+              continue
+            fi
             echo "Building $name..."
             cd "$name"
             npm install
