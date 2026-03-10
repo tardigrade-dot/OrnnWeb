@@ -11,7 +11,7 @@ function extractWords(text) {
 }
 const handleGenerateAIWords = async () => {
     const { pipeline, env } = await import('@huggingface/transformers');
-    const domainInput = '人工智能';
+    const domainInput = '汽车制造';
     env.remoteHost = 'https://modelscope.cn';
     // const modelId = 'HuggingFaceTB/SmolLM2-360M-Instruct';
     const modelId = 'onnx-community/Qwen2.5-0.5B-Instruct';
@@ -19,7 +19,7 @@ const handleGenerateAIWords = async () => {
     console.log(`start load model ${modelId}...`);
     const generator = await pipeline('text-generation', modelId, {
         device: 'cpu',
-        dtype: 'q4', // 4-bit quantization for faster inference
+        dtype: 'fp16', // 4-bit quantization for faster inference
         progress_callback: (p) => {
             if (p.status === 'progress') {
                 console.log(p.progress);
@@ -27,7 +27,7 @@ const handleGenerateAIWords = async () => {
         },
         
     });
-    const prompt = `according to "${domainInput}", Generate 50 unique, professional terms. `;
+    const prompt = `according to "${domainInput}", Generate 100 unique, professional terms. `;
 
     const messages = [
         { role: "system", content: "You are a helpful assistant." },

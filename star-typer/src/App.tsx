@@ -408,7 +408,7 @@ export default function App() {
           dtype: 'q4', // 4-bit quantization for faster inference
           progress_callback: (p) => {
               if (p.status === 'progress') {
-                  setModelProgress("loading model...", p.progress);
+                  setModelProgress(p.progress);
               }
           },
       });
