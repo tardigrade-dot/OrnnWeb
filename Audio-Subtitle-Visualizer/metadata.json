@@ -1,0 +1,5 @@
+{
+  "name": "Audio Subtitle Sync Visualizer",
+  "description": "Load WAV audio files with waveform visualization and sync them with SRT subtitle files.",
+  "requestFramePermissions": []
+}
