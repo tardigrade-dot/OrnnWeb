@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Rocket, Shield, Zap, Trophy, Play, RefreshCw, Keyboard, Volume2, VolumeX } from 'lucide-react';
+import { Rocket, Shield, Zap, Trophy, Play, RefreshCw, Keyboard, Volume2, VolumeX, Heart } from 'lucide-react';
 import { soundService } from './services/soundService';
 
 // --- Constants ---
@@ -61,6 +61,7 @@ export default function App() {
   const [aiError, setAiError] = useState<string | null>(null);
   const [modelProgress, setModelProgress] = useState<number | null>(null);
   const [wordSource, setWordSource] = useState<'DEFAULT' | 'AI' | 'URL'>('DEFAULT');
+  const [lives, setLives] = useState(5);
 
   // Game Refs
   const wordsRef = useRef<Word[]>([]);
@@ -74,6 +75,7 @@ export default function App() {
   const wordsEliminatedRef = useRef(0);
   const levelRef = useRef(1);
   const customWordsRef = useRef<string[] | null>(null);
+  const livesRef = useRef(5);
 
   // Sync customWords state to ref
   useEffect(() => {
@@ -140,13 +142,20 @@ export default function App() {
     }
 
     // Update words
-    wordsRef.current.forEach(word => {
+    for (let i = wordsRef.current.length - 1; i >= 0; i--) {
+      const word = wordsRef.current[i];
       word.y += word.speed;
       if (word.y > CANVAS_HEIGHT - 40) {
-        setGameState('GAMEOVER');
-        soundService.playGameOver();
+        livesRef.current -= 1;
+        setLives(livesRef.current);
+        soundService.playExplosion();
+        wordsRef.current.splice(i, 1); // Remove the word that reached the bottom
+        if (livesRef.current <= 0) {
+          setGameState('GAMEOVER');
+          soundService.playGameOver();
+        }
       }
-    });
+    }
 
     // Update particles
     particlesRef.current.forEach(p => {
@@ -318,8 +327,10 @@ export default function App() {
     scoreRef.current = 0;
     wordsEliminatedRef.current = 0;
     levelRef.current = 1;
+    livesRef.current = 5;
     setScore(0);
     setLevel(1);
+    setLives(5);
     speedRef.current = INITIAL_SPEED;
     spawnRateRef.current = SPAWN_RATE;
     setGameState('PLAYING');
@@ -477,7 +488,7 @@ export default function App() {
           </div>
         </div>
         <div className="flex gap-4 items-center pointer-events-auto">
-          <button 
+          <button
             onClick={toggleSound}
             className="p-2 hover:bg-white/10 rounded-full transition-colors"
             title={soundEnabled ? "Mute Sound" : "Unmute Sound"}
@@ -485,9 +496,17 @@ export default function App() {
             {soundEnabled ? <Volume2 className="w-5 h-5 text-white/60" /> : <VolumeX className="w-5 h-5 text-red-400" />}
           </button>
           <div className="flex flex-col items-end">
+          </div>
+        </div>
+        <div className="flex gap-1">
             <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">High Score</span>
             <span className="text-xl font-mono leading-none text-white/60">{highScore.toString().padStart(6, '0')}</span>
-          </div>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Heart
+              key={i}
+              className={`w-5 h-5 ${i < lives ? 'fill-red-500 text-red-500' : 'text-gray-600'}`}
+            />
+          ))}
         </div>
       </div>
 
@@ -677,8 +696,8 @@ export default function App() {
                 className="text-center space-y-8"
               >
                 <div className="space-y-2">
-                  <h2 className="text-6xl font-bold tracking-tighter text-blue-500">MISSION FINISHED</h2>
-                  <p className="text-white/60 uppercase tracking-widest text-sm">Your mission is finished</p>
+                  <h2 className="text-6xl font-bold tracking-tighter text-white">Game Over</h2>
+                  <p className="text-white/60 uppercase tracking-widest text-sm">Thanks for playing</p>
                 </div>
 
                 <div className="flex justify-center gap-12 py-8 border-y border-white/10">
@@ -695,10 +714,10 @@ export default function App() {
                 <div className="flex gap-4 justify-center">
                   <button
                     onClick={startGame}
-                    className="px-8 py-4 bg-white text-black font-bold uppercase tracking-widest rounded-full hover:bg-red-500 hover:text-white transition-all duration-300 flex items-center gap-3"
+                    className="px-8 py-4 bg-white text-black font-bold uppercase tracking-widest rounded-full hover:bg-blue-500 hover:text-white transition-all duration-300 flex items-center gap-3"
                   >
                     <RefreshCw className="w-5 h-5" />
-                    Retry Mission
+                    Play Again
                   </button>
                 </div>
               </motion.div>
