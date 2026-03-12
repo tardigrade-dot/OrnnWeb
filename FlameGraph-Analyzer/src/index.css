@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@layer base {
+  input[type="range"]::-webkit-slider-thumb {
+    @apply w-4 h-4 bg-orange-500 rounded-full cursor-pointer appearance-none border-2 border-white shadow-sm;
+  }
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 10px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}

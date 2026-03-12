@@ -1,0 +1,5 @@
+{
+  "name": "MNIST Digit Drawer",
+  "description": "A tool for drawing hand-written digits and exporting them as MNIST-style images with adjustable scaling.",
+  "requestFramePermissions": []
+}

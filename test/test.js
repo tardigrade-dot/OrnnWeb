@@ -1,4 +1,5 @@
 
+
 function extractWords(text) {
   const words = text
     .split(/\s+/)                         // 按空格分割
@@ -11,8 +12,8 @@ function extractWords(text) {
 }
 const handleGenerateAIWords = async () => {
     const { pipeline, env } = await import('@huggingface/transformers');
-    const domainInput = '汽车制造';
     env.remoteHost = 'https://modelscope.cn';
+    const domainInput = '汽车制造';
     // const modelId = 'HuggingFaceTB/SmolLM2-360M-Instruct';
     const modelId = 'onnx-community/Qwen2.5-0.5B-Instruct';
 
@@ -42,4 +43,23 @@ const handleGenerateAIWords = async () => {
     const words = extractWords(generatedText);
     console.log("words: ",words)
 };
-handleGenerateAIWords();
+// handleGenerateAIWords();
+async function mask_test(){
+
+    const { pipeline, env } = await import('@huggingface/transformers');
+    env.remoteHost = 'https://modelscope.cn';
+    const unmasker = await pipeline('fill-mask', 'Xenova/bert-base-chinese',{
+        device: 'cpu',
+        dtype: 'fp16', // 4-bit quantization for faster inference
+        progress_callback: (p) => {
+            if (p.status === 'progress') {
+                console.log(p.progress);
+            }
+        },
+        
+    });
+    undefined_word = ['著', '發', '樂', '後', '覺', '乾', '裡', '會', '髮', '費', '對', '標', '愛', '麵', '裝', '視', '廣', '龍', '雲', '鳥', '機', '藝', '書', '雜', '錢', '頭', '錄', '顏', '體', '龜', '魚']
+    const output = await unmasker(['The goal of life is [MASK].', '随[MASK]中文版《非驴非马》在反复修改后逐渐成形，我才由遥远模糊的记忆中回想起']);
+    console.log(output)
+}
+mask_test()
