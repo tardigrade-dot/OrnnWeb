@@ -39,7 +39,7 @@ export default function App() {
       
       unmaskerRef.current = await pipeline('fill-mask', 'tardigrade-doc/chinese-ambiguous-chars-model', {
         device: 'webgpu',
-        dtype: 'fp32',
+        dtype: 'fp16',
         progress_callback: (p: any) => {
           if (p.status === 'progress') {
             setProgress(Math.floor(p.progress));
