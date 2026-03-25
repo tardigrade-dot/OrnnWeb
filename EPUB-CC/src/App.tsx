@@ -2,13 +2,13 @@ import React, { useState, useCallback, useRef } from 'react';
 import JSZip from 'jszip';
 import * as OpenCC from 'opencc-js';
 import { saveAs } from 'file-saver';
-import { Upload, FileText, Download, CheckCircle2, Loader2, AlertCircle, BookOpen, ArrowRightLeft, Settings, Brain } from 'lucide-react';
+import { Upload, FileText, Download, CheckCircle2, Loader2, AlertCircle, BookOpen, Settings, Brain, Image, Layout } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type ConversionStatus = 'idle' | 'processing' | 'completed' | 'error';
 type ConversionMode = 't2s' | 's2t';
 
-const DEFAULT_DISPUTED_WORDS = '著,發,樂,後,覺,乾,裡,會,髮,費,對,標,愛,麵,裝,視,廣,龍,雲,鳥,機,藝,書,雜,錢,頭,錄,顏,體,龜,魚';
+const DEFAULT_DISPUTED_WORDS = '著-著着,畫-画划,覆-覆复,鍊-炼链,乾-乾干,帳-帐账,藉-借藉';
 
 export default function App() {
   const [file, setFile] = useState<File | null>(null);
@@ -16,6 +16,8 @@ export default function App() {
   const [mode, setMode] = useState<ConversionMode>('t2s');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [convertedBlob, setConvertedBlob] = useState<Blob | null>(null);
+  const [newFileName, setNewFileName] = useState<string>('');
   
   // Strong Conversion States
   const [useStrongConversion, setUseStrongConversion] = useState(false);
@@ -24,6 +26,10 @@ export default function App() {
   const [modelLoaded, setModelLoaded] = useState(false);
   const unmaskerRef = useRef<any>(null);
 
+  // Layout and Image Options
+  const [convertVerticalToHorizontal, setConvertVerticalToHorizontal] = useState(false);
+  const [removeImages, setRemoveImages] = useState(false);
+
   const loadModel = async () => {
     try {
       setIsModelLoading(true);
@@ -31,9 +37,9 @@ export default function App() {
       const { pipeline, env } = await import('@huggingface/transformers');
       // env.remoteHost = 'https://modelscope.cn';
       
-      unmaskerRef.current = await pipeline('fill-mask', 'Xenova/bert-base-chinese', {
+      unmaskerRef.current = await pipeline('fill-mask', 'tardigrade-doc/chinese-ambiguous-chars-model', {
         device: 'webgpu',
-        dtype: 'fp16',
+        dtype: 'fp32',
         progress_callback: (p: any) => {
           if (p.status === 'progress') {
             setProgress(Math.floor(p.progress));
@@ -68,38 +74,140 @@ export default function App() {
   const processWithMask = async (text: string) => {
     if (!unmaskerRef.current || !useStrongConversion) return text;
 
-    const words = disputedWords.split(/[,，\s]+/).filter(w => w.length > 0);
-    if (words.length === 0) return text;
+    // Parse word pairs: "原始字-候选项" (e.g., "著-著着")
+    const wordPairs = disputedWords.split(/[,，\s]+/).filter(w => w.includes('-'));
+    if (wordPairs.length === 0) return text;
+
+    // Build a map: original char -> candidates (string of possible chars after '-')
+    const candidateMap = new Map<string, string>();
+    for (const pair of wordPairs) {
+      const [original, candidates] = pair.split('-');
+      if (original && candidates) {
+        candidateMap.set(original, candidates);
+      }
+    }
+    if (candidateMap.size === 0) return text;
 
     let resultText = text;
-    // We process in chunks to avoid blocking the UI too much and handle large texts
-    // For simplicity, we search for each disputed word
-    for (const word of words) {
-      let index = resultText.indexOf(word);
+
+    // Process each original character
+    for (const [original, candidates] of candidateMap) {
+      let index = resultText.indexOf(original);
       while (index !== -1) {
         // Extract context (e.g., 20 chars around)
         const start = Math.max(0, index - 20);
-        const end = Math.min(resultText.length, index + word.length + 20);
+        const end = Math.min(resultText.length, index + original.length + 20);
         const context = resultText.substring(start, end);
-        const maskedContext = context.replace(word, '[MASK]');
-        
+        const maskedContext = context.replace(original, '[MASK]');
+
         try {
           const predictions = await unmaskerRef.current(maskedContext);
           if (predictions && predictions.length > 0) {
-            const topPrediction = predictions[0].token_str;
-            if (topPrediction && topPrediction !== '[UNK]') {
-              // Replace only the specific occurrence
-              resultText = resultText.substring(0, index) + topPrediction + resultText.substring(index + word.length);
+            // Find the first prediction that matches one of our candidates
+            let replaced = false;
+            for (const pred of predictions) {
+              const tokenStr = pred.token_str;
+              // Check if prediction is one of our candidates (after '-')
+              if (tokenStr && tokenStr !== '[UNK]' && candidates.includes(tokenStr)) {
+                resultText = resultText.substring(0, index) + tokenStr + resultText.substring(index + original.length);
+                replaced = true;
+                break;
+              }
             }
+            // If no candidate found, keep original (do nothing)
           }
         } catch (err) {
           console.warn('Mask prediction failed for context:', maskedContext, err);
         }
-        
-        index = resultText.indexOf(word, index + 1);
+
+        index = resultText.indexOf(original, index + 1);
       }
     }
     return resultText;
+  };
+
+  // Convert vertical writing mode to horizontal
+  const convertVerticalToHorizontalText = (text: string): string => {
+    if (!convertVerticalToHorizontal) return text;
+
+    // Remove vertical writing mode CSS
+    let result = text
+      // Remove -webkit-writing-mode: vertical-...
+      .replace(/-webkit-writing-mode\s*:\s*vertical-[lr tb]+;?\s*/gi, '')
+      // Remove writing-mode: vertical-...
+      .replace(/writing-mode\s*:\s*vertical-[lr tb]+;?\s*/gi, '')
+      // Remove text-orientation: upright/mixed
+      .replace(/text-orientation\s*:\s*(upright|mixed|vertical-right);?\s*/gi, '')
+      // Add horizontal writing mode (default)
+      .replace(/<style([^>]*)>/gi, (match, attrs) => {
+        // Make sure body gets horizontal writing mode
+        if (attrs.includes('body') || attrs.includes('html') || attrs.includes('content')) {
+          return match;
+        }
+        return match;
+      });
+
+    // Also wrap content in body with horizontal styles if needed
+    if (!result.includes('writing-mode:') && !result.includes('-webkit-writing-mode:')) {
+      // Add horizontal writing mode to body
+      result = result.replace(/<body([^>]*)>/gi, (match, attrs) => {
+        if (attrs.includes('style=')) {
+          // Append to existing style
+          return match.replace(/style="([^"]*)"/gi, 'style="$1 writing-mode: horizontal-tb; -webkit-writing-mode: horizontal-tb;"');
+        } else {
+          // Add new style attribute
+          return `<body${attrs} style="writing-mode: horizontal-tb; -webkit-writing-mode: horizontal-tb;">`;
+        }
+      });
+    }
+
+    return result;
+  };
+
+  // Image file extensions to remove
+  const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico'];
+  
+  // Check if a file is an image based on extension
+  const isImageFile = (fileName: string): boolean => {
+    const lowerName = fileName.toLowerCase();
+    return IMAGE_EXTENSIONS.some(ext => lowerName.endsWith(ext));
+  };
+
+  // Remove images from content
+  const removeImagesFromText = (text: string): string => {
+    if (!removeImages) return text;
+
+    let result = text
+      // Remove <img ... /> tags
+      .replace(/<img[^>]*\/?>/gi, '')
+      // Remove <image ... /> tags (SVG)
+      .replace(/<image[^>]*\/?>/gi, '')
+      // Remove <figure> tags often used for images
+      .replace(/<figure[^>]*>[\s\S]*?<\/figure>/gi, '')
+      // Remove div wrappers commonly used for images
+      .replace(/<div[^>]*class="[^"]*(?:image|img|illustration|photo)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+      // Remove <picture> elements
+      .replace(/<picture[^>]*>[\s\S]*?<\/picture>/gi, '');
+
+    return result;
+  };
+
+  // Remove image items from OPF manifest and spine
+  const removeImagesFromOpf = (opfContent: string): string => {
+    if (!removeImages) return opfContent;
+
+    let result = opfContent;
+
+    // Remove image items from manifest - handle both self-closing and regular tags
+    // Match <item ... /> or <item ... ></item> where media-type starts with "image/"
+    result = result.replace(/<item[^>]*media-type=["']image\/[^"']*["'][^>]*\/?>/gi, '');
+    result = result.replace(/<item[^>]*media-type=["']image\/[^"']*["'][^>]*>[\s\S]*?<\/item>/gi, '');
+
+    // Also remove items with image extensions in href (handle paths like "images/cover.jpg")
+    result = result.replace(/<item[^>]*href=["'][^"']*?\.(?:jpg|jpeg|png|gif|bmp|webp|svg|ico)["'][^>]*\/?>/gi, '');
+    result = result.replace(/<item[^>]*href=["'][^"']*?\.(?:jpg|jpeg|png|gif|bmp|webp|svg|ico)["'][^>]*>[\s\S]*?<\/item>/gi, '');
+
+    return result;
   };
 
   const convertEpub = async () => {
@@ -128,37 +236,69 @@ export default function App() {
 
       for (const fileName of fileNames) {
         const zipFile = content.files[fileName];
-        
-        if (!zipFile.dir && (
-          fileName.endsWith('.html') || 
-          fileName.endsWith('.xhtml') || 
-          fileName.endsWith('.opf') || 
-          fileName.endsWith('.ncx') ||
-          fileName.endsWith('.txt')
-        )) {
-          const text = await zipFile.async('string');
-          // Step 1: OpenCC conversion
-          let convertedText = converter(text);
-          
-          // Step 2: MASK model processing (Strong Conversion)
-          if (useStrongConversion) {
-            convertedText = await processWithMask(convertedText);
+
+        if (!zipFile.dir) {
+          // Remove image files if removeImages is enabled
+          if (removeImages && isImageFile(fileName)) {
+            zip.remove(fileName); // Actually remove the image from ZIP
+            continue;
           }
-          
-          zip.file(fileName, convertedText);
+
+          if (
+            fileName.endsWith('.html') ||
+            fileName.endsWith('.xhtml') ||
+            fileName.endsWith('.opf') ||
+            fileName.endsWith('.ncx') ||
+            fileName.endsWith('.txt')
+          ) {
+            const text = await zipFile.async('string');
+            // Step 1: OpenCC conversion
+            let convertedText = converter(text);
+
+            // Step 2: Remove images from content if enabled
+            convertedText = removeImagesFromText(convertedText);
+
+            // Step 3: Remove image items from OPF manifest if enabled
+            if (fileName.endsWith('.opf') && removeImages) {
+              convertedText = removeImagesFromOpf(convertedText);
+            }
+
+            // Step 4: Convert vertical to horizontal if enabled
+            convertedText = convertVerticalToHorizontalText(convertedText);
+
+            // Step 5: MASK model processing (Strong Conversion)
+            if (useStrongConversion) {
+              convertedText = await processWithMask(convertedText);
+            }
+
+            zip.file(fileName, convertedText);
+          }
         }
-        
+
         processedCount++;
         setProgress(Math.floor(10 + (processedCount / totalFiles) * 80));
       }
 
       setProgress(95);
-      const blob = await zip.generateAsync({ type: 'blob', mimeType: 'application/epub+zip' });
+      const blob = await zip.generateAsync({ 
+        type: 'blob', 
+        mimeType: 'application/epub+zip',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 6 } // 中等压缩级别，平衡速度和大小
+      });
+
+      let suffix = mode === 't2s' ? '_简体' : '_繁体';
+      suffix = removeImages ? suffix + "_noimg": suffix;
+      suffix = convertVerticalToHorizontal ? suffix + "_hori": suffix;
+
+      const outputFileName = file.name.replace(/\.epub$/i, `${suffix}.epub`);
       
-      const suffix = mode === 't2s' ? '_简体' : '_繁体';
-      const newFileName = file.name.replace(/\.epub$/i, `${suffix}.epub`);
-      saveAs(blob, newFileName);
+      // Save blob and filename for re-download
+      setConvertedBlob(blob);
+      setNewFileName(outputFileName);
       
+      saveAs(blob, outputFileName);
+
       setProgress(100);
       setStatus('completed');
     } catch (err) {
@@ -173,6 +313,14 @@ export default function App() {
     setStatus('idle');
     setProgress(0);
     setError(null);
+    setConvertedBlob(null);
+    setNewFileName('');
+  };
+
+  const handleReDownload = () => {
+    if (convertedBlob && newFileName) {
+      saveAs(convertedBlob, newFileName);
+    }
   };
 
   return (
@@ -222,6 +370,41 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Other Conversion Options */}
+                <div className="bg-zinc-50 rounded-2xl p-6 border border-zinc-100 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Layout className="text-emerald-600" size={20} />
+                      <span className="font-bold text-sm">竖版转横排</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={convertVerticalToHorizontal}
+                        onChange={(e) => setConvertVerticalToHorizontal(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Image className="text-emerald-600" size={20} />
+                      <span className="font-bold text-sm">去掉书籍内的图片</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={removeImages}
+                        onChange={(e) => setRemoveImages(e.target.checked)}
+                      />
+                      <div className="w-11 h-6 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
+                </div>
+
                 {/* Strong Conversion Options */}
                 <div className="bg-zinc-50 rounded-2xl p-6 border border-zinc-100 space-y-4">
                   <div className="flex items-center justify-between">
@@ -248,7 +431,7 @@ export default function App() {
                     >
                       <div className="flex items-center justify-between gap-4">
                         <p className="text-xs text-zinc-500 flex-1">
-                          启用 BERT MASK 模型对争议字进行上下文推理。初次使用需下载约 400MB 模型。
+                          启用 BERT MASK 模型对争议字进行上下文推理。初次使用需下载约 205MB 模型。
                         </p>
                         <button
                           onClick={loadModel}
@@ -273,7 +456,7 @@ export default function App() {
                         <textarea
                           value={disputedWords}
                           onChange={(e) => setDisputedWords(e.target.value)}
-                          placeholder="例如: 著,發,樂..."
+                          placeholder="例如: 著-著着,畫-画划"
                           className="w-full h-20 p-3 rounded-xl border border-zinc-200 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all resize-none bg-white"
                         />
                       </div>
@@ -393,10 +576,7 @@ export default function App() {
                       转换另一个
                     </button>
                     <button
-                      onClick={() => {
-                        setError('下载已开始');
-                        setTimeout(() => setError(null), 3000);
-                      }}
+                      onClick={handleReDownload}
                       className="px-8 py-4 rounded-2xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all flex items-center justify-center gap-2"
                     >
                       <Download size={20} />

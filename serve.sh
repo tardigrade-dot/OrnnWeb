@@ -31,7 +31,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return super().translate_path(path)
     
     def log_message(self, format, *args):
-        print(f'HTTP  {args[0]} {args[1]} -> {args[2]}')
+        print(f'HTTP  {args[0]} {args[1]}')
 
 with socketserver.TCPServer(('', PORT), Handler) as httpd:
     httpd.serve_forever()

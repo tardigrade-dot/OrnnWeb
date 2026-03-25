@@ -46,9 +46,11 @@ const handleGenerateAIWords = async () => {
 // handleGenerateAIWords();
 async function mask_test(){
 
+    // const model_id = 'onnx-community/chinese-roberta-wwm-ext-ONNX';
+    const model_id = 'tardigrade-doc/chinese-ambiguous-chars-model';
     const { pipeline, env } = await import('@huggingface/transformers');
-    env.remoteHost = 'https://modelscope.cn';
-    const unmasker = await pipeline('fill-mask', 'Xenova/bert-base-chinese',{
+    // env.remoteHost = 'https://modelscope.cn';
+    const unmasker = await pipeline('fill-mask', model_id,{
         device: 'cpu',
         dtype: 'fp16', // 4-bit quantization for faster inference
         progress_callback: (p) => {
@@ -56,10 +58,32 @@ async function mask_test(){
                 console.log(p.progress);
             }
         },
-        
     });
-    undefined_word = ['著', '發', '樂', '後', '覺', '乾', '裡', '會', '髮', '費', '對', '標', '愛', '麵', '裝', '視', '廣', '龍', '雲', '鳥', '機', '藝', '書', '雜', '錢', '頭', '錄', '顏', '體', '龜', '魚']
-    const output = await unmasker(['The goal of life is [MASK].', '随[MASK]中文版《非驴非马》在反复修改后逐渐成形，我才由遥远模糊的记忆中回想起']);
-    console.log(output)
+    disputed_word = ['著', '發', '樂', '後', '覺', '乾', '裡', '會', '髮', '費', '對', '標', '愛', '麵', '裝', '視', '廣', '龍', '雲', '鳥', '機', '藝', '書', '雜', '錢', '頭', '錄', '顏', '體', '龜', '魚']
+    disputed_word_res = [('著', ['著', '着']), ('發',['發','发'])]
+    
+    // resultText = opencc();
+    //策略: 强校验(在候选中取最大score), 需提供校验的字, 但是对于出现在
+    resultText = [
+        '在这座城市内生活著名为XX的种族', 
+        '细数著名牌上的虚拟数字',
+        '他饶有兴致地细数著名牌上的虚拟数字', 
+        '在这座城市内生活著，名为XX的种族', 
+    ]
+
+    console.log(resultText);
+    for (const word of disputed_word) {
+
+        for (_r of resultText){
+
+            let index = _r.indexOf(word);
+            if (index !== -1) {
+                _r = _r.replace(word, '[MASK]');
+                console.log("start model call", _r);
+                const output = await unmasker(_r);
+                console.log(output[0]);
+            }
+        }
+    }
 }
 mask_test()
