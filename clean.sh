@@ -18,18 +18,12 @@ if [ -d "./dist" ]; then
     ((removed_count++))
 fi
 
-# Remove subproject dist and node_modules
-for dir in */; do
-    if [ -d "${dir}dist" ]; then
-        rm -rf "${dir}dist"
-        echo -e "${GREEN}✓${NC} Removed ${dir}dist"
-        ((removed_count++))
-    fi
-    if [ -d "${dir}node_modules" ]; then
-        rm -rf "${dir}node_modules"
-        echo -e "${GREEN}✓${NC} Removed ${dir}node_modules"
-        ((removed_count++))
-    fi
-done
+# Remove root node_modules (optional - usually you don't want to remove node_modules)
+# Keeping this commented out to avoid accidental removal
+# if [ -d "./node_modules" ]; then
+#     rm -rf ./node_modules
+#     echo -e "${GREEN}✓${NC} Removed ./node_modules"
+#     ((removed_count++))
+# fi
 
 echo -e "${GREEN}✅ Cleanup complete! Removed ${removed_count} directories.${NC}"

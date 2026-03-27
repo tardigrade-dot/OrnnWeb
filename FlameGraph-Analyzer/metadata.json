@@ -1,5 +1,0 @@
-{
-  "name": "FlameAI - Interactive Flamegraph Viewer",
-  "description": "Upload, filter, and analyze flamegraphs. Export optimized data for AI analysis.",
-  "requestFramePermissions": []
-}

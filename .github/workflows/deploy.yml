@@ -1,4 +1,4 @@
-name: Build and Deploy All Tools
+name: Build and Deploy OrnnWeb
 
 on:
   push:
@@ -24,32 +24,11 @@ jobs:
         with:
           node-version: 20
 
-      - name: Build all subprojects
-        run: |
-          mkdir -p dist
+      - name: Install dependencies
+        run: npm install
 
-          # 拷贝根目录 index.html
-          if [ -f index.html ]; then
-            cp index.html dist/
-          fi
-          for dir in */ ; do
-            name=${dir%/}
-            if [ ! -f "$name/package.json" ]; then
-              continue
-            fi
-            if [[ $name =~ ^test ]]; then
-              echo "⏭️  Skipping $name (test)"
-              continue
-            fi
-            echo "Building $name..."
-            cd "$name"
-            npm install
-            npx vite build --base=/OrnnWeb/$name/
-            cd ..
-
-            mkdir -p dist/$name
-            cp -r $name/dist/. dist/$name/
-          done
+      - name: Build
+        run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

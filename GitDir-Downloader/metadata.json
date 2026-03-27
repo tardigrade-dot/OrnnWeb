@@ -1,5 +1,0 @@
-{
-  "name": "GitDir Downloader",
-  "description": "Download all files from a specific GitHub repository directory as a ZIP archive.",
-  "requestFramePermissions": []
-}
