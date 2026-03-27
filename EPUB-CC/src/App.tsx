@@ -37,9 +37,9 @@ export default function App() {
       const { pipeline, env } = await import('@huggingface/transformers');
       // env.remoteHost = 'https://modelscope.cn';
       
-      unmaskerRef.current = await pipeline('fill-mask', 'tardigrade-doc/chinese-ambiguous-chars-model', {
+      unmaskerRef.current = await pipeline('fill-mask', 'onnx-community/bert-base-chinese-ONNX', {
         device: 'webgpu',
-        dtype: 'fp16',
+        dtype: 'fp32',
         progress_callback: (p: any) => {
           if (p.status === 'progress') {
             setProgress(Math.floor(p.progress));
