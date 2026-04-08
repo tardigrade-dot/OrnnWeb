@@ -35,7 +35,7 @@ export default function App() {
       setIsModelLoading(true);
       setError(null);
       const { pipeline, env } = await import('@huggingface/transformers');
-      // env.remoteHost = 'https://modelscope.cn';
+      env.remoteHost = 'https://modelscope.cn';
       
       unmaskerRef.current = await pipeline('fill-mask', 'onnx-community/bert-base-chinese-ONNX', {
         device: 'webgpu',

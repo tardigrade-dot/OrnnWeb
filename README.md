@@ -1,7 +1,6 @@
 # OrnnWeb
 
-### FlameGraph Analyzer
-FlameGraph Analyzer allows you to extract portions of SVG flamegraphs to interact with AI models, enabling the AI to analyze and provide insights on performance data efficiently.
-
-### GitDir Downloader
-GitDir Downloader is a tool for downloading selected files or directories from GitHub repositories, making it easy to work with specific parts of a project without cloning the entire repository.
+## 待办
+1.图片标记: 需要支持划线, 图片重传
+2.字幕对齐: 新增字幕区间无法编辑, 编辑太费劲
+3.火焰图: demo文件失效, 需要更新
