@@ -50,6 +50,7 @@ interface WaveformRowProps {
   duration: number;
   rowDuration: number;
   subtitles: Subtitle[];
+  vadSubtitles: Subtitle[];
   anomalies: Anomaly[];
   currentTime: number;
   onSeek: (time: number) => void;
@@ -67,6 +68,7 @@ const WaveformRow: React.FC<WaveformRowProps> = ({
   duration, 
   rowDuration, 
   subtitles, 
+  vadSubtitles,
   anomalies,
   currentTime, 
   onSeek,
@@ -198,6 +200,47 @@ const WaveformRow: React.FC<WaveformRowProps> = ({
         })}
       </div>
 
+      {/* VAD Track */}
+      {vadSubtitles.length > 0 && (
+        <div className="relative h-6 mt-2">
+          {vadSubtitles.map((s) => {
+            if (s.startSeconds >= startTime + rowDuration || s.endSeconds <= startTime) return null;
+
+            const startPos = ((s.startSeconds - startTime) / rowDuration) * 100;
+            const endPos = ((s.endSeconds - startTime) / rowDuration) * 100;
+            
+            const clippedStart = Math.max(0, startPos);
+            const clippedEnd = Math.min(100, endPos);
+            const clippedWidth = clippedEnd - clippedStart;
+
+            const isActive = currentTime >= s.startSeconds && currentTime <= s.endSeconds;
+            const isEmpty = !s.text || s.text.trim() === '';
+
+            return (
+              <div
+                key={`vad-${s.id}`}
+                className={cn(
+                  "absolute h-full rounded-md p-1.5 text-[10px] leading-tight overflow-hidden transition-all border",
+                  isEmpty 
+                    ? (isActive ? "bg-blue-500/80 border-blue-500/50 z-10 shadow-lg scale-[1.02]" : "bg-blue-500/40 border-blue-500/30 hover:bg-blue-500/60")
+                    : (isActive 
+                        ? "bg-[#141414] text-[#E4E3E0] border-[#E4E3E0]/30 z-10 shadow-lg scale-[1.02]" 
+                        : "bg-white/40 text-[#141414]/70 border-[#141414]/10 hover:bg-white/60")
+                )}
+                style={{ 
+                  left: `${clippedStart}%`, 
+                  width: `${clippedWidth}%`,
+                  minWidth: '20px'
+                }}
+                title={isEmpty ? "VAD Region" : s.text}
+              >
+                {!isEmpty && <div className="truncate ui-monospace italic">{s.text}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Subtitles Track */}
       <div className="relative h-12 mt-2">
         {subtitles.map((s) => {
@@ -250,8 +293,10 @@ export default function App() {
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
+  const [vadSubtitles, setVadSubtitles] = useState<Subtitle[]>([]);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [srtFile, setSrtFile] = useState<File | null>(null);
+  const [vadSrtFile, setVadSrtFile] = useState<File | null>(null);
   const [decodedBuffer, setDecodedBuffer] = useState<AudioBuffer | null>(null);
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [amplitudeThreshold, setAmplitudeThreshold] = useState(DEFAULT_THRESHOLD);
@@ -313,6 +358,25 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  const processVadSrtFile = (file: File) => {
+    setVadSrtFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      const parser = new Parser();
+      const parsed = parser.fromSrt(content);
+      setVadSubtitles(parsed.map(s => ({
+        id: s.id,
+        startTime: s.startTime,
+        startSeconds: s.startSeconds,
+        endTime: s.endTime,
+        endSeconds: s.endSeconds,
+        text: s.text
+      })));
+    };
+    reader.readAsText(file);
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -321,6 +385,8 @@ export default function App() {
       const name = file.name.toLowerCase();
       if (file.type.startsWith('audio/') || name.endsWith('.wav') || name.endsWith('.mp3')) {
         processAudioFile(file);
+      } else if (name.endsWith('.vad.srt')) {
+        processVadSrtFile(file);
       } else if (name.endsWith('.srt')) {
         processSrtFile(file);
       }
@@ -504,6 +570,8 @@ export default function App() {
       const name = file.name.toLowerCase();
       if (file.type.startsWith('audio/') || name.endsWith('.wav') || name.endsWith('.mp3')) {
         processAudioFile(file);
+      } else if (name.endsWith('.vad.srt')) {
+        processVadSrtFile(file);
       } else if (name.endsWith('.srt')) {
         processSrtFile(file);
       }
@@ -599,13 +667,13 @@ export default function App() {
             <input 
               type="file" 
               multiple 
-              accept="audio/wav,audio/mpeg,.srt" 
+              accept="audio/wav,audio/mpeg,.srt,.vad.srt" 
               onChange={handleFileUpload} 
               className="hidden" 
             />
           </label>
 
-          {(audioFile || srtFile) && (
+          {(audioFile || srtFile || vadSrtFile) && (
             <div className="hidden md:flex items-center gap-4 px-4 py-2 border border-[#141414]/10 rounded-full bg-white/20 text-[10px] font-mono">
               <div className="flex items-center gap-1.5">
                 <div className={cn("w-1.5 h-1.5 rounded-full", audioFile ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-red-500")} />
@@ -615,6 +683,11 @@ export default function App() {
               <div className="flex items-center gap-1.5">
                 <div className={cn("w-1.5 h-1.5 rounded-full", srtFile ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-red-500")} />
                 <span className={cn(srtFile ? "opacity-100" : "opacity-30")}>SRT</span>
+              </div>
+              <div className="w-px h-3 bg-[#141414]/10" />
+              <div className="flex items-center gap-1.5">
+                <div className={cn("w-1.5 h-1.5 rounded-full", vadSrtFile ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-red-500")} />
+                <span className={cn(vadSrtFile ? "opacity-100" : "opacity-30")}>VAD</span>
               </div>
             </div>
           )}
@@ -656,6 +729,7 @@ export default function App() {
                     duration={duration}
                     rowDuration={secondsPerLine}
                     subtitles={subtitles}
+                    vadSubtitles={vadSubtitles}
                     anomalies={anomalies}
                     currentTime={currentTime}
                     onSeek={handleSeek}
